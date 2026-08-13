@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date
+
 
 class ActividadCrear(BaseModel):
     nombre: str
@@ -7,6 +8,8 @@ class ActividadCrear(BaseModel):
     estado: str
     fecha: date
     completada: bool
+    tarea_id: int
+
 
 class ActividadRespuesta(BaseModel):
     id: int
@@ -16,3 +19,5 @@ class ActividadRespuesta(BaseModel):
     fecha: date
     completada: bool
     tarea_id: int
+
+    model_config = ConfigDict(from_attributes=True)

@@ -1,115 +1,121 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+
+# Importaciones de tu base de datos y modelos
+from app.database import engine, get_db
+from app.models import Base, UsuarioModel, TareaModel, ActividadModel
+
+# Importaciones de tus esquemas actualizados
 from app.schemas.usuario import UsuarioCrear, UsuarioRespuesta
 from app.schemas.tarea import TareaCrear, TareaRespuesta
 from app.schemas.actividad import ActividadCrear, ActividadRespuesta
 
+# Crea las tablas en PostgreSQL automáticamente al iniciar
+Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
-
-# Base de datos en memoria
-usuarios = []
-tareas = []
-actividades = []
-
-# Contadores de ID
-usuario_id_counter = 1
-tarea_id_counter = 1
-actividad_id_counter = 1
+app = FastAPI(
+    title="API de Gestión de Tareas",
+    description="Proyecto ADSO - FastAPI con SQLAlchemy y PostgreSQL",
+    version="1.0.0"
+)
 
 
-# ------------------- USUARIOS -------------------
+@app.get("/")
+def leer_raiz():
+    return {"mensaje": "Bienvenido a la API de Gestión de Tareas - SENA ADSO"}
 
-@app.get("/usuarios/")
-def obtener_usuarios():
+
+# ==========================================
+# ENDPOINTS DE USUARIOS
+# ==========================================
+
+@app.post("/usuarios/", response_model=UsuarioRespuesta, status_code=201)
+def crear_usuario(usuario: UsuarioCrear, db: Session = Depends(get_db)):
+    db_usuario = UsuarioModel(nombre=usuario.nombre, correo=usuario.correo)
+    db.add(db_usuario)
+    db.commit()
+    db.refresh(db_usuario)
+    return db_usuario
+
+
+@app.get("/usuarios/", response_model=List[UsuarioRespuesta])
+def listar_usuarios(db: Session = Depends(get_db)):
+    usuarios = db.query(UsuarioModel).all()
     return usuarios
 
 
-@app.post("/usuarios/")
-def crear_usuario(usuario: UsuarioCrear):
-    global usuario_id_counter
+# ==========================================
+# ENDPOINTS DE TAREAS
+# ==========================================
 
-    nuevo_usuario = {
-        "id": usuario_id_counter,
-        "nombre": usuario.nombre,
-        "correo": usuario.correo
-    }
+@app.post("/tareas/", response_model=TareaRespuesta, status_code=201)
+def crear_tarea(tarea: TareaCrear, db: Session = Depends(get_db)):
+    # Validar que el usuario exista antes de crear la tarea
+    usuario = db.query(UsuarioModel).filter(UsuarioModel.id == tarea.usuario_id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="El usuario asignado no existe")
 
-    usuarios.append(nuevo_usuario)
-    usuario_id_counter += 1
-
-    return nuevo_usuario
-
-
-
-# ------------------- TAREAS -------------------
-
-@app.post("/tareas/")
-def crear_tarea(tarea: TareaCrear):
-    global tarea_id_counter
-
-    # Validar que el usuario exista
-    usuario_existe = any(u["id"] == tarea.usuario_id for u in usuarios)
-
-    if not usuario_existe:
-        return {"error": "El usuario no existe"}
-
-    nueva_tarea = {
-        "id": tarea_id_counter,
-        **tarea.model_dump()
-    }
-
-    tareas.append(nueva_tarea)
-    tarea_id_counter += 1
-
-    return nueva_tarea
+    db_tarea = TareaModel(**tarea.model_dump())
+    db.add(db_tarea)
+    db.commit()
+    db.refresh(db_tarea)
+    return db_tarea
 
 
-@app.get("/tareas/")
-def obtener_tareas():
+@app.get("/tareas/", response_model=List[TareaRespuesta])
+def listar_tareas(db: Session = Depends(get_db)):
+    tareas = db.query(TareaModel).all()
     return tareas
 
 
-# ------------------- ACTIVIDADES -------------------
+# ==========================================
+# ENDPOINTS DE ACTIVIDADES
+# ==========================================
 
-# ------------------- ACTIVIDADES -------------------
+@app.post("/actividades/", response_model=ActividadRespuesta, status_code=201)
+def crear_actividad(actividad: ActividadCrear, db: Session = Depends(get_db)):
+    # Validar que la tarea exista
+    tarea = db.query(TareaModel).filter(TareaModel.id == actividad.tarea_id).first()
+    if not tarea:
+        raise HTTPException(status_code=404, detail="La tarea asignada no existe")
 
-@app.get("/actividades/")
-def obtener_actividades():
+    db_actividad = ActividadModel(**actividad.model_dump())
+    db.add(db_actividad)
+    db.commit()
+    db.refresh(db_actividad)
+    return db_actividad
+
+
+@app.get("/actividades/", response_model=List[ActividadRespuesta])
+def listar_actividades(db: Session = Depends(get_db)):
+    actividades = db.query(ActividadModel).all()
     return actividades
 
+# ==========================================
+# ENDPOINTS DE EDICIÓN (PUT) Y ELIMINACIÓN (DELETE)
+# ==========================================
 
-@app.post("/tareas/")
-def crear_tarea(tarea: TareaCrear):
-    global tarea_id_counter
+# Ejemplo: Cambiar estado de completada en actividad
+@app.patch("/actividades/{actividad_id}", response_model=ActividadRespuesta)
+def actualizar_actividad(actividad_id: int, db: Session = Depends(get_db)):
+    db_actividad = db.query(ActividadModel).filter(ActividadModel.id == actividad_id).first()
+    if not db_actividad:
+        raise HTTPException(status_code=404, detail="Actividad no encontrada")
+    
+    # Cambia True por False o viceversa
+    db_actividad.completada = not db_actividad.completada
+    db.commit()
+    db.refresh(db_actividad)
+    return db_actividad
 
-    # Validar que el usuario exista
-    usuario_existe = any(u["id"] == tarea.usuario_id for u in usuarios)
-
-    if not usuario_existe:
-        return {"error": "El usuario no existe"}
-
-    nueva_tarea = {
-        "id": tarea_id_counter,
-        **tarea.dict()
-    }
-
-    tareas.append(nueva_tarea)
-    tarea_id_counter += 1
-
-    return nueva_tarea
-
-
-@app.get("/tareas/")
-def obtener_tareas():
-    return tareas
-
-
-@app.patch("/actividades/{actividad_id}")
-def actualizar_actividad(actividad_id: int, actividad: ActividadCrear):
-
-    for a in actividades:
-        if a["id"] == actividad_id:
-            a.update(actividad.model_dump())
-            return a
-
-    return {"error": "La actividad no existe"}
+# Ejemplo: Eliminar una tarea
+@app.delete("/tareas/{tarea_id}")
+def eliminar_tarea(tarea_id: int, db: Session = Depends(get_db)):
+    db_tarea = db.query(TareaModel).filter(TareaModel.id == tarea_id).first()
+    if not db_tarea:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+    
+    db.delete(db_tarea)
+    db.commit()
+    return {"mensaje": "Tarea eliminada con éxito"}

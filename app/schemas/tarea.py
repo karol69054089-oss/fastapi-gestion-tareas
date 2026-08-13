@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date
+from app.schemas.usuario import UsuarioRespuesta
 
 
 class TareaCrear(BaseModel):
@@ -21,3 +22,6 @@ class TareaRespuesta(BaseModel):
     fecha_inicio: date
     fecha_final: date
     usuario_id: int
+    usuario: UsuarioRespuesta | None = None  # Muestra el usuario asociado
+
+    model_config = ConfigDict(from_attributes=True)
