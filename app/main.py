@@ -78,26 +78,30 @@ def obtener_actividades():
     return actividades
 
 
-@app.post("/tareas/{tarea_id}/actividades/")
-def crear_actividad(tarea_id: int, actividad: ActividadCrear):
-    global actividad_id_counter
+@app.post("/tareas/")
+def crear_tarea(tarea: TareaCrear):
+    global tarea_id_counter
 
-    # Validar que la tarea exista
-    tarea_existe = any(t["id"] == tarea_id for t in tareas)
+    # Validar que el usuario exista
+    usuario_existe = any(u["id"] == tarea.usuario_id for u in usuarios)
 
-    if not tarea_existe:
-        return {"error": "La tarea no existe"}
+    if not usuario_existe:
+        return {"error": "El usuario no existe"}
 
-    nueva_actividad = {
-        "id": actividad_id_counter,
-        **actividad.model_dump(),
-        "tarea_id": tarea_id
+    nueva_tarea = {
+        "id": tarea_id_counter,
+        **tarea.dict()
     }
 
-    actividades.append(nueva_actividad)
-    actividad_id_counter += 1
+    tareas.append(nueva_tarea)
+    tarea_id_counter += 1
 
-    return nueva_actividad
+    return nueva_tarea
+
+
+@app.get("/tareas/")
+def obtener_tareas():
+    return tareas
 
 
 @app.patch("/actividades/{actividad_id}")
