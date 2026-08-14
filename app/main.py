@@ -1,115 +1,221 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from typing import List
+
 from app.schemas.usuario import UsuarioCrear, UsuarioRespuesta
 from app.schemas.tarea import TareaCrear, TareaRespuesta
 from app.schemas.actividad import ActividadCrear, ActividadRespuesta
 
 
-app = FastAPI()
+app = FastAPI(
+    title="API de Gestión de Tareas - Versión Memoria",
+    description="Proyecto ADSO - Persistencia en memoria",
+    version="1.0.0"
+)
 
-# Base de datos en memoria
+
+# =========================================================
+# BASES DE DATOS EN MEMORIA
+# =========================================================
+
 usuarios = []
 tareas = []
 actividades = []
 
-# Contadores de ID
-usuario_id_counter = 1
-tarea_id_counter = 1
-actividad_id_counter = 1
+
+# Contadores para generar IDs
+contador_usuario = 1
+contador_tarea = 1
+contador_actividad = 1
 
 
-# ------------------- USUARIOS -------------------
+# =========================================================
+# INICIO
+# =========================================================
 
-@app.get("/usuarios/")
-def obtener_usuarios():
-    return usuarios
+@app.get("/")
+def leer_raiz():
+    return {
+        "mensaje": "Bienvenido a la API de Gestión de Tareas - Versión Memoria"
+    }
 
 
-@app.post("/usuarios/")
+# =========================================================
+# USUARIOS
+# =========================================================
+
+@app.post(
+    "/usuarios/",
+    response_model=UsuarioRespuesta,
+    status_code=201
+)
 def crear_usuario(usuario: UsuarioCrear):
-    global usuario_id_counter
+
+    global contador_usuario
+
+    # Validar que el correo sea único
+    for usuario_existente in usuarios:
+        if usuario_existente["correo"] == usuario.correo:
+            raise HTTPException(
+                status_code=409,
+                detail="El correo ya está registrado"
+            )
 
     nuevo_usuario = {
-        "id": usuario_id_counter,
+        "id": contador_usuario,
         "nombre": usuario.nombre,
         "correo": usuario.correo
     }
 
     usuarios.append(nuevo_usuario)
-    usuario_id_counter += 1
+    contador_usuario += 1
 
     return nuevo_usuario
 
 
+@app.get(
+    "/usuarios/",
+    response_model=List[UsuarioRespuesta]
+)
+def listar_usuarios():
+    return usuarios
 
-# ------------------- TAREAS -------------------
 
-@app.post("/tareas/")
+# =========================================================
+# TAREAS
+# =========================================================
+
+@app.post(
+    "/tareas/",
+    response_model=TareaRespuesta,
+    status_code=201
+)
 def crear_tarea(tarea: TareaCrear):
-    global tarea_id_counter
+
+    global contador_tarea
 
     # Validar que el usuario exista
-    usuario_existe = any(u["id"] == tarea.usuario_id for u in usuarios)
+    usuario = None
 
-    if not usuario_existe:
-        return {"error": "El usuario no existe"}
+    for usuario_existente in usuarios:
+        if usuario_existente["id"] == tarea.usuario_id:
+            usuario = usuario_existente
+            break
+
+    if usuario is None:
+        raise HTTPException(
+            status_code=404,
+            detail="El usuario asignado no existe"
+        )
+
+    nuevo_usuario = usuario.copy()
 
     nueva_tarea = {
-        "id": tarea_id_counter,
-        **tarea.model_dump()
+        "id": contador_tarea,
+        "nombre": tarea.nombre,
+        "descripcion": tarea.descripcion,
+        "estado": tarea.estado,
+        "avance": tarea.avance,
+        "fecha_inicio": tarea.fecha_inicio,
+        "fecha_final": tarea.fecha_final,
+        "usuario_id": tarea.usuario_id,
+        "usuario": nuevo_usuario
     }
 
     tareas.append(nueva_tarea)
-    tarea_id_counter += 1
+    contador_tarea += 1
 
     return nueva_tarea
 
 
-@app.get("/tareas/")
-def obtener_tareas():
+@app.get(
+    "/tareas/",
+    response_model=List[TareaRespuesta]
+)
+def listar_tareas():
     return tareas
 
 
-# ------------------- ACTIVIDADES -------------------
+# =========================================================
+# ACTIVIDADES
+# =========================================================
 
-# ------------------- ACTIVIDADES -------------------
+@app.post(
+    "/tareas/{tarea_id}/actividades/",
+    response_model=ActividadRespuesta,
+    status_code=201
+)
+def crear_actividad(
+    tarea_id: int,
+    actividad: ActividadCrear
+):
 
-@app.get("/actividades/")
-def obtener_actividades():
+    global contador_actividad
+
+    # Validar que la tarea exista
+    tarea = None
+
+    for tarea_existente in tareas:
+        if tarea_existente["id"] == tarea_id:
+            tarea = tarea_existente
+            break
+
+    if tarea is None:
+        raise HTTPException(
+            status_code=404,
+            detail="La tarea asignada no existe"
+        )
+
+    # Validar que el ID enviado coincida con el de la URL
+    if actividad.tarea_id != tarea_id:
+        raise HTTPException(
+            status_code=400,
+            detail="El tarea_id debe coincidir con el de la URL"
+        )
+
+    nueva_actividad = {
+        "id": contador_actividad,
+        "nombre": actividad.nombre,
+        "descripcion": actividad.descripcion,
+        "estado": actividad.estado,
+        "fecha": actividad.fecha,
+        "completada": actividad.completada,
+        "tarea_id": tarea_id
+    }
+
+    actividades.append(nueva_actividad)
+    contador_actividad += 1
+
+    return nueva_actividad
+
+
+@app.get(
+    "/actividades/",
+    response_model=List[ActividadRespuesta]
+)
+def listar_actividades():
     return actividades
 
 
-@app.post("/tareas/")
-def crear_tarea(tarea: TareaCrear):
-    global tarea_id_counter
+# =========================================================
+# ACTUALIZAR ACTIVIDAD
+# =========================================================
 
-    # Validar que el usuario exista
-    usuario_existe = any(u["id"] == tarea.usuario_id for u in usuarios)
+@app.patch(
+    "/actividades/{actividad_id}",
+    response_model=ActividadRespuesta
+)
+def actualizar_actividad(actividad_id: int):
 
-    if not usuario_existe:
-        return {"error": "El usuario no existe"}
+    for actividad in actividades:
 
-    nueva_tarea = {
-        "id": tarea_id_counter,
-        **tarea.dict()
-    }
+        if actividad["id"] == actividad_id:
 
-    tareas.append(nueva_tarea)
-    tarea_id_counter += 1
+            # Cambiar True por False o False por True
+            actividad["completada"] = not actividad["completada"]
 
-    return nueva_tarea
+            return actividad
 
-
-@app.get("/tareas/")
-def obtener_tareas():
-    return tareas
-
-
-@app.patch("/actividades/{actividad_id}")
-def actualizar_actividad(actividad_id: int, actividad: ActividadCrear):
-
-    for a in actividades:
-        if a["id"] == actividad_id:
-            a.update(actividad.model_dump())
-            return a
-
-    return {"error": "La actividad no existe"}
+    raise HTTPException(
+        status_code=404,
+        detail="Actividad no encontrada"
+    )
