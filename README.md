@@ -1,32 +1,42 @@
-# FastAPI Gestión de Tareas
+ # FastAPI Gestión de Tareas
 
-Proyecto desarrollado para el programa de formación Análisis y Desarrollo de Software (ADSO) - SENA.
+Proyecto desarrollado para el programa de formación **Análisis y Desarrollo de Software (ADSO)** del SENA.
 
 ## Descripción
-API RESTful diseñada para gestionar Usuarios, Tareas y Actividades, utilizando una arquitectura modular con FastAPI, SQLAlchemy y PostgreSQL.
 
-## Estructura del Proyecto
-- `/app`: Código fuente principal.
-  - `/schemas`: Modelos de validación (Pydantic).
-  - `models.py`: Entidades de base de datos (SQLAlchemy).
-  - `database.py`: Configuración de conexión y sesión.
-  - `main.py`: Endpoints y lógica de la API.
+API RESTful para la gestión de usuarios, tareas y actividades.
 
----
+El proyecto fue desarrollado utilizando:
 
-## Diagrama Entidad-Relación (MER)
-![MER](/docs/MER_Gestion_Tareas.drawio.png)
+- Python
+- FastAPI
+- Pydantic
+- SQLAlchemy
+- PostgreSQL
+- Git
+- GitHub
 
----
+La aplicación permite crear, consultar, actualizar y eliminar usuarios, tareas y actividades.
 
-## Proceso de Desarrollo
-1. **Fase 1 (main):** Documentación inicial, creación del diagrama MER y configuración del entorno de trabajo.
-2. **Fase 2 (v-memoria):** Desarrollo de la lógica de negocio simulada en memoria (ramas y diccionarios).
-3. **Fase 3 (v-postgres):** Migración a base de datos relacional PostgreSQL, implementación de ORM con SQLAlchemy, inyección de dependencias y variables de entorno (`.env`).
+## Estructura del proyecto
 
----
-
-## Instalación y Configuración
-1. Clonar el repositorio: 
-   ```bash
-   git clone <url-de-tu-repo>
+```text
+fastapi-gestion-tareas/
+│
+├── app/
+│   ├── schemas/
+│   │   ├── usuario.py
+│   │   ├── tarea.py
+│   │   └── actividad.py
+│   │
+│   ├── database.py
+│   ├── models.py
+│   └── main.py
+│
+├── docs/
+│   └── MER_Gestion_Tareas.drawio.png
+│
+├── .env
+├── .gitignore
+├── README.md
+└── requirements.txt
