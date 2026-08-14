@@ -1,19 +1,27 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from typing import List
 
+# Base de datos y modelos
 from app.database import engine, get_db
 from app.models import Base, UsuarioModel, TareaModel, ActividadModel
 
+# Esquemas Pydantic
 from app.schemas.usuario import UsuarioCrear, UsuarioRespuesta
 from app.schemas.tarea import TareaCrear, TareaRespuesta
 from app.schemas.actividad import ActividadCrear, ActividadRespuesta
 
 
-# Crear las tablas en PostgreSQL
+# =========================================================
+# CREACIÓN DE TABLAS
+# =========================================================
+
 Base.metadata.create_all(bind=engine)
 
+
+# =========================================================
+# CONFIGURACIÓN DE LA API
+# =========================================================
 
 app = FastAPI(
     title="API de Gestión de Tareas",
@@ -23,7 +31,7 @@ app = FastAPI(
 
 
 # =========================================================
-# INICIO
+# ENDPOINT PRINCIPAL
 # =========================================================
 
 @app.get("/")
@@ -34,7 +42,7 @@ def leer_raiz():
 
 
 # =========================================================
-# USUARIOS - CRUD
+# USUARIOS - CREAR
 # =========================================================
 
 @app.post(
@@ -46,7 +54,7 @@ def crear_usuario(
     usuario: UsuarioCrear,
     db: Session = Depends(get_db)
 ):
-    # Verificar que el correo no exista
+    # Verificar que el correo sea único
     usuario_existente = (
         db.query(UsuarioModel)
         .filter(UsuarioModel.correo == usuario.correo)
@@ -71,6 +79,10 @@ def crear_usuario(
     return db_usuario
 
 
+# =========================================================
+# USUARIOS - LEER
+# =========================================================
+
 @app.get(
     "/usuarios/",
     response_model=List[UsuarioRespuesta]
@@ -78,10 +90,16 @@ def crear_usuario(
 def listar_usuarios(
     db: Session = Depends(get_db)
 ):
-    return db.query(UsuarioModel).all()
+    usuarios = db.query(UsuarioModel).all()
+
+    return usuarios
 
 
-@app.put(
+# =========================================================
+# USUARIOS - EDITAR
+# =========================================================
+
+@app.patch(
     "/usuarios/{usuario_id}",
     response_model=UsuarioRespuesta
 )
@@ -102,6 +120,8 @@ def actualizar_usuario(
             detail="Usuario no encontrado"
         )
 
+    # Verificar que el nuevo correo no esté
+    # siendo utilizado por otro usuario
     correo_existente = (
         db.query(UsuarioModel)
         .filter(
@@ -114,7 +134,7 @@ def actualizar_usuario(
     if correo_existente:
         raise HTTPException(
             status_code=409,
-            detail="El correo ya está registrado por otro usuario"
+            detail="El correo ya está registrado"
         )
 
     db_usuario.nombre = usuario.nombre
@@ -125,6 +145,10 @@ def actualizar_usuario(
 
     return db_usuario
 
+
+# =========================================================
+# USUARIOS - ELIMINAR
+# =========================================================
 
 @app.delete("/usuarios/{usuario_id}")
 def eliminar_usuario(
@@ -152,7 +176,7 @@ def eliminar_usuario(
 
 
 # =========================================================
-# TAREAS - CRUD
+# TAREAS - CREAR
 # =========================================================
 
 @app.post(
@@ -178,7 +202,13 @@ def crear_tarea(
         )
 
     db_tarea = TareaModel(
-        **tarea.model_dump()
+        nombre=tarea.nombre,
+        descripcion=tarea.descripcion,
+        estado=tarea.estado,
+        avance=tarea.avance,
+        fecha_inicio=tarea.fecha_inicio,
+        fecha_final=tarea.fecha_final,
+        usuario_id=tarea.usuario_id
     )
 
     db.add(db_tarea)
@@ -188,6 +218,10 @@ def crear_tarea(
     return db_tarea
 
 
+# =========================================================
+# TAREAS - LEER
+# =========================================================
+
 @app.get(
     "/tareas/",
     response_model=List[TareaRespuesta]
@@ -195,10 +229,16 @@ def crear_tarea(
 def listar_tareas(
     db: Session = Depends(get_db)
 ):
-    return db.query(TareaModel).all()
+    tareas = db.query(TareaModel).all()
+
+    return tareas
 
 
-@app.put(
+# =========================================================
+# TAREAS - EDITAR
+# =========================================================
+
+@app.patch(
     "/tareas/{tarea_id}",
     response_model=TareaRespuesta
 )
@@ -219,6 +259,7 @@ def actualizar_tarea(
             detail="Tarea no encontrada"
         )
 
+    # Validar que el usuario exista
     usuario = (
         db.query(UsuarioModel)
         .filter(UsuarioModel.id == tarea.usuario_id)
@@ -244,6 +285,10 @@ def actualizar_tarea(
 
     return db_tarea
 
+
+# =========================================================
+# TAREAS - ELIMINAR
+# =========================================================
 
 @app.delete("/tareas/{tarea_id}")
 def eliminar_tarea(
@@ -271,7 +316,7 @@ def eliminar_tarea(
 
 
 # =========================================================
-# ACTIVIDADES - CRUD
+# ACTIVIDADES - CREAR
 # =========================================================
 
 @app.post(
@@ -297,15 +342,21 @@ def crear_actividad(
             detail="La tarea asignada no existe"
         )
 
-    # Asegurar que el tarea_id enviado coincida con la URL
+    # Verificar que el tarea_id del cuerpo
+    # coincida con el de la URL
     if actividad.tarea_id != tarea_id:
         raise HTTPException(
             status_code=400,
-            detail="El tarea_id del cuerpo debe coincidir con el de la URL"
+            detail="El tarea_id debe coincidir con el de la URL"
         )
 
     db_actividad = ActividadModel(
-        **actividad.model_dump()
+        nombre=actividad.nombre,
+        descripcion=actividad.descripcion,
+        estado=actividad.estado,
+        fecha=actividad.fecha,
+        completada=actividad.completada,
+        tarea_id=tarea_id
     )
 
     db.add(db_actividad)
@@ -315,6 +366,10 @@ def crear_actividad(
     return db_actividad
 
 
+# =========================================================
+# ACTIVIDADES - LEER
+# =========================================================
+
 @app.get(
     "/actividades/",
     response_model=List[ActividadRespuesta]
@@ -322,10 +377,16 @@ def crear_actividad(
 def listar_actividades(
     db: Session = Depends(get_db)
 ):
-    return db.query(ActividadModel).all()
+    actividades = db.query(ActividadModel).all()
+
+    return actividades
 
 
-@app.put(
+# =========================================================
+# ACTIVIDADES - EDITAR
+# =========================================================
+
+@app.patch(
     "/actividades/{actividad_id}",
     response_model=ActividadRespuesta
 )
@@ -346,6 +407,7 @@ def actualizar_actividad(
             detail="Actividad no encontrada"
         )
 
+    # Validar que la tarea exista
     tarea = (
         db.query(TareaModel)
         .filter(TareaModel.id == actividad.tarea_id)
@@ -371,33 +433,9 @@ def actualizar_actividad(
     return db_actividad
 
 
-@app.patch(
-    "/actividades/{actividad_id}/completada",
-    response_model=ActividadRespuesta
-)
-def cambiar_completada(
-    actividad_id: int,
-    db: Session = Depends(get_db)
-):
-    db_actividad = (
-        db.query(ActividadModel)
-        .filter(ActividadModel.id == actividad_id)
-        .first()
-    )
-
-    if not db_actividad:
-        raise HTTPException(
-            status_code=404,
-            detail="Actividad no encontrada"
-        )
-
-    db_actividad.completada = not db_actividad.completada
-
-    db.commit()
-    db.refresh(db_actividad)
-
-    return db_actividad
-
+# =========================================================
+# ACTIVIDADES - ELIMINAR
+# =========================================================
 
 @app.delete("/actividades/{actividad_id}")
 def eliminar_actividad(
